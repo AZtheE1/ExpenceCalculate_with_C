@@ -1,486 +1,213 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
 #define N 50
 #define M 30
-double currentincome=0;
-double currentexpense=0;
 
-struct node
+double currentincome  = 0;
+double currentexpense = 0;
+
+typedef struct node {
+    char   date[M];
+    double amount;
+    char   category[N];
+    struct node *next;
+} Node;
+
+typedef struct {
+    double x, y;
+} Record;
+
+Node *income  = NULL;
+Node *expense = NULL;
+
+/* ── helpers ──────────────────────────────────────────────── */
+
+static void print_divider(void)
 {
-char date[M];
-double amount;
-char category[N];
-struct node *next;
-}*income=NULL,*expense=NULL;
+    puts("________________________________________________"
+         "________________________________________________\n");
+}
 
-struct record
+/* Append a new record to a linked list in O(1) via tail pointer.
+   We keep a static tail per list; pass the list's head pointer. */
+static void list_append(Node **head, Node **tail,
+                        const char date[], double amount,
+                        const char category[])
 {
-double x,y;
-}*point=NULL;
+    Node *n = malloc(sizeof(Node));
+    if (!n) { fputs("Out of memory\n", stderr); exit(1); }
+    strncpy(n->date,     date,     M - 1); n->date[M - 1]     = '\0';
+    strncpy(n->category, category, N - 1); n->category[N - 1] = '\0';
+    n->amount = amount;
+    n->next   = NULL;
 
+    if (*head == NULL) { *head = *tail = n; }
+    else               { (*tail)->next = n; *tail = n; }
+}
 
-void create(char x[],double y,char z[],struct node **temp);
-void display(int a3);
-struct node *readnext(struct node *ptr,FILE *fpointer);
-void writeincome(struct node *ptr);
-void writeexpense(struct node *ptr);
-void deleterecord(struct node *ptr);
-struct node *readincome(struct node *ptr);
-struct node *readexpense(struct node *ptr);
-void write(struct record *point);
-struct record *readrecord();
-
-
-int main()
+static void list_free(Node *head)
 {
-int option,value;
+    while (head) { Node *tmp = head->next; free(head); head = tmp; }
+}
 
-double b;
-char c[N],a[M];
-char s1[15],s2[15],s3[15];
+/* ── file I/O ─────────────────────────────────────────────── */
 
-
-
-if(fopen("Record.bin","rb")!=NULL)
+/* Write an entire linked list to a binary file.
+   The next pointer is zeroed before writing so the stored struct is clean. */
+static int list_write(Node *head, const char *filename)
 {
-point=readrecord();
-currentincome=point->x;
-currentexpense=point->y;
+    FILE *fp = fopen(filename, "wb");
+    if (!fp) { printf("Cannot save to %s\n", filename); return 0; }
+
+    for (Node *p = head; p; p = p->next) {
+        Node tmp = *p;
+        tmp.next = NULL;
+        fwrite(&tmp, sizeof(Node), 1, fp);
+    }
+    fclose(fp);
+    return 1;
 }
 
-if(fopen("myincome.bin","rb")!=NULL)
+/* Read a binary file back into a freshly allocated linked list.
+   Returns the head, or NULL on error / empty file. */
+static Node *list_read(const char *filename, Node **tail_out)
 {
-income=readincome(income);
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    long size    = ftell(fp);
+    rewind(fp);
+    int  entries = (int)(size / sizeof(Node));
+
+    Node *head = NULL, *tail = NULL;
+    for (int i = 0; i < entries; i++) {
+        Node *n = malloc(sizeof(Node));
+        if (!n) { fputs("Out of memory\n", stderr); fclose(fp); exit(1); }
+        fread(n, sizeof(Node), 1, fp);
+        n->next = NULL;
+        if (!head) { head = tail = n; }
+        else       { tail->next = n; tail = n; }
+    }
+    fclose(fp);
+    if (tail_out) *tail_out = tail;
+    return head;
 }
-if(fopen("myexpense.bin","rb")!=NULL)
+
+/* Persist totals between sessions */
+static void record_write(double inc, double exp)
 {
-expense=readexpense(expense);
+    FILE *fp = fopen("Record.bin", "wb");
+    if (!fp) { fputs("Cannot save Record.bin\n", stderr); return; }
+    Record r = { inc, exp };
+    fwrite(&r, sizeof(Record), 1, fp);
+    fclose(fp);
 }
 
-
-do{
-
-printf("                                           _______________________________________________\n  " );
-printf("                                         |     YOUR INCOME   =      %.2lf Taka      \n ",currentincome);
-printf("                                          |     YOUR EXPENSE  =      %.2lf Taka     \n ",currentexpense);
-printf("                                          |     YOUR BALANCE  =      %.2lf Taka     \n ",currentincome-currentexpense);
-printf("                                          |_______________________________________________\n");
-printf("ENTER THE OPTION FROM THE BELOW \n\n");
-printf("1.INSERT INCOME \n");
-printf("2.INSERT EXPENSE \n");
-printf("3.VIEW INCOME RECORD \n");
-printf("4.VIEW EXPENSE RECORD \n");
-printf("5.EXIT\n");
-scanf("%d",&option);
-printf("\n\n\n");
-
-switch(option)
+static int record_read(double *inc, double *exp)
 {
-case 1:
-printf("**************   ADD INCOME   *****************\n\n");
-printf("Enter The Date(e.g day month year)\n");
-scanf("%s %s %s",s1,s2,s3);
-  strcpy(a,"");
-  strcat(a,s1);
-  strcat(a," ");
-  strcat(a,s2);
-  strcat(a," ");
-  strcat(a,s3);
-printf("Enter The Amount\n");
-scanf("%lf",&b);
-printf("Enter the Category\n");
-scanf("%s",c);
-
-
-
-
-currentincome=currentincome+b;
-create(a,b,c,&income);
-writeincome(income);
-
-break;
-case 2:
-printf("**************    ADD EXPENSE   *****************\n\n");
-printf("Enter The Date(e.g day month year)\n");
-
-scanf("%s %s %s",s1,s2,s3);
-  strcpy(a,"");
-  strcat(a,s1);
-  strcat(a," ");
-  strcat(a,s2);
-  strcat(a," ");
-  strcat(a,s3);
-
-printf("Enter The Amount\n");
-scanf("%lf",&b);
-printf("Enter The Category\n");
-scanf("%s",c);
-
-
-currentexpense=currentexpense+b;
-create(a,b,c,&expense);
-writeexpense(expense);
-
-break;
-case 3:
-printf("*********   YOUR INCOME RECORD IS   *******\n\n");
-display(3);
-break;
-case 4:
-printf("*********   YOUR EXPENSE RECORD IS   *******\n\n");
-display(4);
-break;
-case 5:
-point=(struct record*)malloc(sizeof(struct record));
-point->x=currentincome;
-point->y=currentexpense;
-write(point);
-break;
-default:
-printf("WRONG OPTION SELECTED -Enter Valid Option");
-break;
-}
-}while(option!=5);
-
-
-return 0;
+    FILE *fp = fopen("Record.bin", "rb");
+    if (!fp) return 0;
+    Record r;
+    int ok = (fread(&r, sizeof(Record), 1, fp) == 1);
+    fclose(fp);
+    if (ok) { *inc = r.x; *exp = r.y; }
+    return ok;
 }
 
+/* ── display ──────────────────────────────────────────────── */
 
-
-
-
-
-
-void create(char x[],double y,char z[],struct node **temp)
+static void display_list(Node *head, const char *label)
 {
-struct node *newnode,*ptr;
-newnode=(struct node*)malloc(sizeof(struct node));
-if(*temp==NULL)
+    printf("*********  YOUR %s RECORD  *********\n\n", label);
+    if (!head) { puts("NO RECORDS AVAILABLE\n"); print_divider(); return; }
+    for (Node *p = head; p; p = p->next)
+        printf("Date: %s\nAmount: %.2f Taka\nCategory: %s\n\n",
+               p->date, p->amount, p->category);
+    print_divider();
+}
+
+static void print_summary(void)
 {
-strcpy(newnode->date,x);
-newnode->amount=y;
-strcpy(newnode->category,z);
-newnode->next=NULL;
-*temp=newnode;
+    puts("           _______________________________________________");
+    printf("          |  YOUR INCOME   =  %.2f Taka\n", currentincome);
+    printf("          |  YOUR EXPENSE  =  %.2f Taka\n", currentexpense);
+    printf("          |  YOUR BALANCE  =  %.2f Taka\n", currentincome - currentexpense);
+    puts("          |_______________________________________________\n");
 }
-else
+
+/* ── main ─────────────────────────────────────────────────── */
+
+int main(void)
 {
-ptr=*temp;
-while(ptr->next!=NULL)
-{
-ptr=ptr->next;
+    /* tail pointers so append is O(1) */
+    Node *income_tail  = NULL;
+    Node *expense_tail = NULL;
+
+    record_read(&currentincome, &currentexpense);
+
+    income  = list_read("myincome.bin",  &income_tail);
+    expense = list_read("myexpense.bin", &expense_tail);
+
+    int option;
+    do {
+        print_summary();
+        puts("ENTER THE OPTION FROM THE BELOW\n");
+        puts("1. INSERT INCOME");
+        puts("2. INSERT EXPENSE");
+        puts("3. VIEW INCOME RECORD");
+        puts("4. VIEW EXPENSE RECORD");
+        puts("5. EXIT");
+        if (scanf("%d", &option) != 1) { option = 0; continue; }
+        puts("");
+
+        switch (option) {
+        case 1:
+        case 2: {
+            char s1[15], s2[15], s3[15], date[M], category[N];
+            double amount;
+            int is_income = (option == 1);
+
+            printf("***** ADD %s *****\n\n", is_income ? "INCOME" : "EXPENSE");
+            printf("Enter date (day month year): ");
+            if (scanf("%14s %14s %14s", s1, s2, s3) != 3) break;
+            snprintf(date, M, "%s %s %s", s1, s2, s3);
+
+            printf("Enter amount: ");
+            if (scanf("%lf", &amount) != 1 || amount <= 0) {
+                puts("Invalid amount.\n"); break;
+            }
+            printf("Enter category: ");
+            if (scanf("%49s", category) != 1) break;
+
+            if (is_income) {
+                currentincome += amount;
+                list_append(&income,  &income_tail,  date, amount, category);
+                if (list_write(income, "myincome.bin"))
+                    puts("\nINCOME SAVED SUCCESSFULLY\n");
+            } else {
+                currentexpense += amount;
+                list_append(&expense, &expense_tail, date, amount, category);
+                if (list_write(expense, "myexpense.bin"))
+                    puts("\nEXPENSE SAVED SUCCESSFULLY\n");
+            }
+            print_divider();
+            break;
+        }
+        case 3: display_list(income,  "INCOME");  break;
+        case 4: display_list(expense, "EXPENSE"); break;
+        case 5:
+            record_write(currentincome, currentexpense);
+            puts("Data saved. Goodbye!");
+            break;
+        default:
+            puts("Invalid option — please choose 1-5.\n");
+        }
+    } while (option != 5);
+
+    list_free(income);
+    list_free(expense);
+    return 0;
 }
-strcpy(newnode->date,x);
-newnode->amount=y;
-strcpy(newnode->category,z);
-newnode->next=NULL;
-ptr->next=newnode;
-}
-}
-
-void deleterecord(struct node *ptr)
-{
-struct node *freeme =ptr;
-struct node *holdme=NULL;
-while(freeme!=NULL)
-{
-holdme=freeme->next;
-free(freeme);
-freeme=holdme;
-}
-}
-
-
-
-
-
-
-struct node *readnext(struct node *ptr,FILE *fpointer)
-{
-
-if(ptr==NULL)
-{
-ptr=(struct node *)malloc(sizeof(struct node));
-fread(ptr,sizeof(struct node),1,fpointer);
-ptr->next=NULL;
-}
-else
-{
-struct node *ptr1=ptr;
-struct node *ptr2=(struct node *)malloc(sizeof(struct node));
-while(ptr1->next!=NULL)
-{
-ptr1=ptr1->next;
-}
-fread(ptr2,sizeof(struct node),1,fpointer);
-ptr1->next=ptr2;
-ptr2->next=NULL;
-}
-return ptr;
-}
-
-
-
-
-
-struct node *readincome(struct node *ptr)
-{
-FILE *fpointer;
-fpointer=fopen("myincome.bin","rb");
-if(fpointer!=NULL)
-{
-deleterecord(ptr);
-ptr=NULL;
-fseek(fpointer,0,SEEK_END);
-long filesize=ftell(fpointer);
-rewind(fpointer);
-int entries=(int)(filesize/(sizeof(struct node)));
-for(int i=0;i<entries;i++)
-{
-fseek(fpointer,(sizeof(struct node)*i),SEEK_SET);
-ptr=readnext(ptr,fpointer);
-}
-}
-else
-{
-printf("ERROR IN OPENINNG FILE\n");
-}
-return ptr;
-}
-
-
-
-
-
-
-
-
-void display(int a3)
-{
-   if(a3==3)
-    {
-
-                 if(fopen("myincome.bin","rb")==NULL)
-
-                         {
-                             printf("NO RECORDS AVAILABLE\n\n");
-         printf("________________________________________________________________________________________________________________\n\n");
-
-                        }
-                else
-              {
-
-                     struct node *ptr2=income;
-                    while(ptr2!=NULL)
-                        {
-                              printf("Date: %s\nAmount: %.2lf Taka\nCategory: %s\n\n",ptr2->date,ptr2->
-                             amount,ptr2->category);
-                              ptr2=ptr2->next;
-                        }
-            printf("________________________________________________________________________________________________________________\n\n");
-
-               }
-}
-else if(a3==4)
-   {
-
-                 if(fopen("myexpense.bin","rb")==NULL)
-                          {
-                             printf("NO RECORDS AVAILABLE\n\n");
-         printf("________________________________________________________________________________________________________________\n\n");
-                           }
-                else
-                      {
-
-
-                           struct node *ptr2=expense;
-                                    while(ptr2!=NULL)
-                                    {
-                                         printf("Date: %s\nAmount: %.2lf Taka\nCategory: %s\n\n",ptr2->date,ptr2->
-                                        amount,ptr2->category);
-                                        ptr2=ptr2->next;
-                                     }
-               printf("________________________________________________________________________________________________________________\n\n");
-
-
-                       }
-
-  }
-
-}
-
-
-
-
-
-
-
-
-void writeincome(struct node *ptr)
-{
-FILE *fpointer;
-fpointer=fopen("myincome.bin","wb");
-if(fpointer!=NULL)
-{
-struct node *ptr1=ptr;
-struct node *holdnext=NULL;
-while(ptr1!=NULL)
-{
-holdnext=ptr1->next;
-ptr1->next=NULL;
-fseek(fpointer,0,SEEK_END);
-fwrite(ptr1,sizeof(struct node),1,fpointer);
-ptr1->next=holdnext;
-holdnext=NULL;
-ptr1=ptr1->next;
-}
-fclose(fpointer);
-fpointer=NULL;
-printf("\nINCOME SAVED SUCCESSFULLY\n\n");
- printf("________________________________________________________________________________________________________________\n\n");
-
-}
-else{
-printf("\nCANNOT SAVE INCOME..TRY AGAIN\n");
- printf("________________________________________________________________________________________________________________\n\n");
-
-}
-}
-
-
-
-
-
-void writeexpense(struct node *ptr)
-{
-FILE *fpointer;
-fpointer=fopen("myexpense.bin","wb");
-if(fpointer!=NULL)
-{
-struct node *ptr1=ptr;
-struct node *holdnext=NULL;
-while(ptr1!=NULL)
-{
-holdnext=ptr1->next;
-ptr1->next=NULL;
-fseek(fpointer,0,SEEK_END);
-fwrite(ptr1,sizeof(struct node),1,fpointer);
-ptr1->next=holdnext;
-holdnext=NULL;
-ptr1=ptr1->next;
-}
-fclose(fpointer);
-fpointer=NULL;
-printf("\nEXPENSE SAVED SUCCESSFULLY\n\n");
- printf("________________________________________________________________________________________________________________\n\n");
-
-}
-else{
-printf("\nCANNOT SAVE EXPENSE..TRY AGAIN\n\n");
- printf("________________________________________________________________________________________________________________\n\n");
-
-}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-struct node *readexpense(struct node *ptr)
-{
-FILE *fpointer;
-fpointer=fopen("myexpense.bin","rb");
-if(fpointer!=NULL)
-{
-deleterecord(ptr);
-ptr=NULL;
-fseek(fpointer,0,SEEK_END);
-long filesize=ftell(fpointer);
-rewind(fpointer);
-int entries=(int)(filesize/(sizeof(struct node)));
-for(int i=0;i<entries;i++)
-{
-fseek(fpointer,(sizeof(struct node)*i),SEEK_SET);
-ptr=readnext(ptr,fpointer);
-}
-}
-else
-{
-printf("cannonot open file\n");
-
-}
-return ptr;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void write(struct record *point)
-{
-FILE *fpointer;
-fpointer=fopen("Record.bin","wb");
-if(fpointer!=NULL)
-{
-
-fseek(fpointer,0,SEEK_END);
-fwrite(point,sizeof(struct record),1,fpointer);
-}
-else{
-printf("FILEOPEN ERROR\n");
-}
-fclose(fpointer);
-fpointer=NULL;
-
-}
-
-
-
-
-
-
-struct record *readrecord()
-{
-FILE *fpointer;
-fpointer=fopen("Record.bin","rb");
-struct record *ptr=NULL;
-
-if(fpointer!=NULL)
-{
-
-fseek(fpointer,0,SEEK_SET);
-
-ptr=(struct record *)malloc(sizeof(struct record));
-fread(ptr,sizeof(struct record),1,fpointer);
-
-
-}
-else
-{
-printf("CANNOT OPEN FILE\n");
-}
-return ptr;
-}
-
-
