@@ -1,0 +1,6 @@
+# C project gitignore
+main.exe
+main.o
+*.bin
+*.layout
+*.cbp
