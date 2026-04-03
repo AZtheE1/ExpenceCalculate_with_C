@@ -69,4 +69,10 @@ gcc main.c -lncurses -o hisab_tracker
 - [ ] Password-protected financial records
 
 ---
+---
+## 👤 Author
+- **Name**: azihad783
+- **Email**: [azihad783@gmail.com](mailto:azihad783@gmail.com)
+
+---
 **Developed with ♥ for Financial Freedom.**

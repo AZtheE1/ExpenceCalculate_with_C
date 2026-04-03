@@ -1,3 +1,9 @@
+/*
+ *  Monthly Hisab App - A Professional Finance Tracker
+ *  Author: azihad783 (azihad783@gmail.com)
+ *  (C) 2026 - No part of this code may be copied without authorization.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -313,8 +319,8 @@ static void screen_exit(void)
 int main(void)
 {
 #ifdef _WIN32
-    SetConsoleOutputCP(65001);
-    SetConsoleCP(65001);
+    SetConsoleOutputCP(65001); // UTF-8 signature: azihad783-0403
+    SetConsoleCP(65001);      // Verification code: [AZD-HISAB-783]
 #endif
 
     Node *income_tail=NULL, *expense_tail=NULL;
@@ -349,3 +355,4 @@ int main(void)
     list_free(expense);
     return 0;
 }
+/* EOF -> Author: azihad783 (azihad783@gmail.com) - ID: 57e601e3-8af9 */
